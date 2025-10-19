@@ -83,6 +83,8 @@ class SHCDeviceHelper:
             devices.extend(self._devices_by_model["SWD2"].values())
         if "SWD2_PLUS" in SUPPORTED_MODELS:
             devices.extend(self._devices_by_model["SWD2_PLUS"].values())
+        if "SWD2_DUAL" in SUPPORTED_MODELS:
+            devices.extend(self._devices_by_model["SWD2_DUAL"].values())
         return devices
 
     @property
@@ -165,9 +167,12 @@ class SHCDeviceHelper:
 
     @property
     def smart_plugs_compact(self) -> typing.Sequence[SHCSmartPlugCompact]:
-        if "PLUG_COMPACT" not in SUPPORTED_MODELS:
-            return []
-        return list(self._devices_by_model["PLUG_COMPACT"].values())
+        devices = []
+        if "PLUG_COMPACT" in SUPPORTED_MODELS:
+            devices.extend(self._devices_by_model["PLUG_COMPACT"].values())
+        if "PLUG_COMPACT_DUAL" in SUPPORTED_MODELS:
+            devices.extend(self._devices_by_model["PLUG_COMPACT_DUAL"].values())
+        return devices
 
     @property
     def smoke_detectors(self) -> typing.Sequence[SHCSmokeDetector]:
@@ -191,6 +196,8 @@ class SHCDeviceHelper:
             devices.extend(self._devices_by_model["TRV"].values())
         if "TRV_GEN2" in SUPPORTED_MODELS:
             devices.extend(self._devices_by_model["TRV_GEN2"].values())
+        if "TRV_GEN2_DUAL" in SUPPORTED_MODELS:
+            devices.extend(self._devices_by_model["TRV_GEN2_DUAL"].values())
         return devices
 
     @property

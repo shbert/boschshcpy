@@ -289,13 +289,21 @@ class SHCMicromoduleRelay(
     def relay_type(self) -> RelayType:
         return (
             self.RelayType.BUTTON
-            if self.profile == "GENERIC"
+            if self._impulseswitch_service is not None
             else self.RelayType.SWITCH
         )
 
     def trigger_impulse_state(self):
         if self._impulseswitch_service:
             self._impulseswitch_service.put_state_element("impulseState", True)
+
+    @property
+    def impulse_length(self) -> int:
+        return self._impulseswitch_service.impulse_length
+
+    @impulse_length.setter
+    def impulse_length(self, impulse_length: int):
+        self._impulseswitch_service.put_state_element("impulseLength", impulse_length)
 
     @property
     def instant_of_last_impulse(self) -> str:
@@ -323,7 +331,7 @@ class SHCShutterControl(SHCDevice):
 
     @property
     def operation_state(self) -> ShutterControlService.State:
-        return self._service.value
+        return self._service.operation_state
 
 
 class SHCMicromoduleShutterControl(
@@ -800,92 +808,66 @@ class SHCLight(SHCDevice):
 
     @property
     def brightness(self) -> int:
-        if (
-            self._capabilities & self.Capabilities.BRIGHTNESS
-        ) == self.Capabilities.BRIGHTNESS:
+        if self.supports_brightness:
             return self._multilevelswitch_service.value
         return 0
 
     @brightness.setter
     def brightness(self, state: int):
-        if (
-            self._capabilities & self.Capabilities.BRIGHTNESS
-        ) == self.Capabilities.BRIGHTNESS:
+        if self.supports_brightness:
             self._multilevelswitch_service.put_state_element("level", state)
 
     @property
     def color(self) -> int:
-        if (
-            self._capabilities & self.Capabilities.COLOR_TEMP
-        ) == self.Capabilities.COLOR_TEMP:
+        if self.supports_color_temp:
             return self._huecolortemperature_service.value
         return 0
 
     @color.setter
     def color(self, state: int):
-        if (
-            self._capabilities & self.Capabilities.COLOR_TEMP
-        ) == self.Capabilities.COLOR_TEMP:
+        if self.supports_color_temp:
             self._huecolortemperature_service.put_state_element(
                 "colorTemperature", state
             )
 
     @property
     def rgb(self) -> int:
-        if (
-            self._capabilities & self.Capabilities.COLOR_HSB
-        ) == self.Capabilities.COLOR_HSB:
+        if self.supports_color_hsb:
             return self._hsbcoloractuator_service.value
         return 0
 
     @rgb.setter
     def rgb(self, state: int):
-        if (
-            self._capabilities & self.Capabilities.COLOR_HSB
-        ) == self.Capabilities.COLOR_HSB:
+        if self.supports_color_hsb:
             self._hsbcoloractuator_service.put_state_element("rgb", state)
 
     @property
     def min_color_temperature(self) -> int:
-        if (
-            self._capabilities & self.Capabilities.COLOR_TEMP
-        ) == self.Capabilities.COLOR_TEMP:
+        if self.supports_color_temp:
             return self._huecolortemperature_service.min_value
-        if (
-            self._capabilities & self.Capabilities.COLOR_HSB
-        ) == self.Capabilities.COLOR_HSB:
+        if self.supports_color_hsb:
             return self._hsbcoloractuator_service.min_value
         return 0
 
     @property
     def max_color_temperature(self) -> int:
-        if (
-            self._capabilities & self.Capabilities.COLOR_TEMP
-        ) == self.Capabilities.COLOR_TEMP:
+        if self.supports_color_temp:
             return self._huecolortemperature_service.max_value
-        if (
-            self._capabilities & self.Capabilities.COLOR_HSB
-        ) == self.Capabilities.COLOR_HSB:
+        if self.supports_color_hsb:
             return self._hsbcoloractuator_service.max_value
         return 0
 
     @property
     def supports_brightness(self) -> bool:
-        return (
-            self._capabilities & self.Capabilities.BRIGHTNESS
-        ) == self.Capabilities.BRIGHTNESS
+        return bool(self._capabilities & self.Capabilities.BRIGHTNESS)
 
     @property
     def supports_color_temp(self) -> bool:
-        return (
-            self._capabilities & self.Capabilities.COLOR_TEMP
-        ) == self.Capabilities.COLOR_TEMP
+        return bool(self._capabilities & self.Capabilities.COLOR_TEMP)
 
     @property
     def supports_color_hsb(self) -> bool:
-        return (
-            self._capabilities & self.Capabilities.COLOR_HSB
-        ) == self.Capabilities.COLOR_HSB
+        return bool(self._capabilities & self.Capabilities.COLOR_HSB)
 
 
 class SHCWaterLeakageSensor(SHCBatteryDevice):
@@ -941,6 +923,7 @@ class SHCMicromoduleDimmer(
 MODEL_MAPPING = {
     "SWD": SHCShutterContact,
     "SWD2": SHCShutterContact2,
+    "SWD2_DUAL": SHCShutterContact2,
     "SWD2_PLUS": SHCShutterContact2Plus,
     "BBL": SHCShutterControl,
     "MICROMODULE_AWNING": SHCMicromoduleShutterControl,
@@ -952,6 +935,7 @@ MODEL_MAPPING = {
     "MICROMODULE_LIGHT_CONTROL": SHCLightControl,
     "MICROMODULE_RELAY": SHCMicromoduleRelay,
     "PLUG_COMPACT": SHCSmartPlugCompact,
+    "PLUG_COMPACT_DUAL": SHCSmartPlugCompact,
     "SD": SHCSmokeDetector,
     "SMOKE_DETECTOR2": SHCSmokeDetector,
     "CAMERA_EYES": SHCCameraEyes,
@@ -959,6 +943,7 @@ MODEL_MAPPING = {
     "ROOM_CLIMATE_CONTROL": SHCClimateControl,
     "TRV": SHCThermostat,
     "TRV_GEN2": SHCThermostat,
+    "TRV_GEN2_DUAL": SHCThermostat,
     "THB": SHCWallThermostat,
     "BWTH": SHCWallThermostat,
     "BWTH24": SHCWallThermostat,

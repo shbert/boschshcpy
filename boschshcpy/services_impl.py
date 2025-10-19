@@ -282,6 +282,7 @@ class ValveTappetService(SHCDeviceService):
         RUN_TO_START_POSITION = "RUN_TO_START_POSITION"
         IN_START_POSITION = "IN_START_POSITION"
         NOT_AVAILABLE = "NOT_AVAILABLE"
+        NO_VALVE_BODY_ERROR = "NO_VALVE_BODY_ERROR"
 
     @property
     def position(self) -> int:
@@ -475,20 +476,10 @@ class ShutterControlService(SHCDeviceService):
 
     def __init__(self, api, raw_device_service):
         super().__init__(api=api, raw_device_service=raw_device_service)
-        self._current_level = self.state["level"]
-        self._last_level = self.state["level"]
 
     @property
-    def value(self) -> State:
-        if self._current_level != self.level:
-            self._last_level = self._current_level
-            self._current_level = self.level
-        if self.state["operationState"] == "MOVING" and self.level < self._last_level:
-            return self.State("CLOSING")
-        elif self.state["operationState"] == "MOVING" and self.level > self._last_level:
-            return self.State("OPENING")
-        else:
-            return self.State(self.state["operationState"])
+    def operation_state(self) -> State:
+        return self.State(self.state["operationState"])
 
     @property
     def calibrated(self) -> bool:
@@ -500,7 +491,7 @@ class ShutterControlService(SHCDeviceService):
 
     def summary(self):
         super().summary()
-        print(f"    operationState           : {self.value}")
+        print(f"    operationState           : {self.operation_state}")
         print(f"    Level                    : {self.level}")
         print(f"    Calibrated               : {self.calibrated}")
 
@@ -612,6 +603,10 @@ class ImpulseSwitchService(SHCDeviceService):
     @property
     def impulse_state(self) -> bool:
         return self.state["impulseState"]
+
+    @property
+    def impulse_length(self) -> int:
+        return self.state["impulseLength"]
 
     @property
     def instant_of_last_impulse(self) -> str:
@@ -796,6 +791,7 @@ class CommunicationQualityService(SHCDeviceService):
         MEDIUM = "MEDIUM"
         NORMAL = "NORMAL"
         UNKNOWN = "UNKNOWN"
+        FETCHING = "FETCHING"
 
     @property
     def value(self) -> State:
@@ -907,6 +903,9 @@ SERVICE_MAPPING = {
 }
 
 #    "SmokeDetectionControl": SmokeDetectionControlService,
+#    "ElectricalFaults": ElectricalFaultsService,
+#    "SwitchConfiguration": SwitchConfigurationService,
+#    "Linking": LinkingService,
 
 SUPPORTED_DEVICE_SERVICE_IDS = SERVICE_MAPPING.keys()
 

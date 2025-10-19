@@ -14,6 +14,8 @@ from .exceptions import SHCAuthenticationError, SHCSessionError
 from .information import SHCInformation
 from .room import SHCRoom
 from .scenario import SHCScenario
+from .message import SHCMessage
+from .emma import SHCEmma
 from .userdefinedstate import SHCUserDefinedState
 from .services_impl import SUPPORTED_DEVICE_SERVICE_IDS
 
@@ -41,8 +43,10 @@ class SHCSession:
         self._devices_by_id = {}
         self._services_by_device_id = defaultdict(list)
         self._domains_by_id = {}
+        self._messages_by_id = {}
         self._userdefinedstates_by_id = {}
         self._subscribers = []
+        self._emma: SHCEmma = SHCEmma(self._api)
 
         if not lazy:
             self._enumerate_all()
@@ -62,8 +66,10 @@ class SHCSession:
         self._enumerate_devices()
         self._enumerate_rooms()
         self._enumerate_scenarios()
+        self._enumerate_messages()
         self._enumerate_userdefinedstates()
         self._initialize_domains()
+        self._initialize_emma()
 
     def _add_device(self, raw_device, update_services=False) -> SHCDevice:
         device_id = raw_device["id"]
@@ -121,11 +127,20 @@ class SHCSession:
             scenario = SHCScenario(api=self._api, raw_scenario=raw_scenario)
             self._scenarios_by_id[scenario_id] = scenario
 
+    def _enumerate_messages(self):
+        raw_messages = self._api.get_messages()
+        for raw_message in raw_messages:
+            message_id = raw_message["id"]
+            message = SHCMessage(api=self._api, raw_message=raw_message)
+            self._messages_by_id[message_id] = message
+
     def _enumerate_userdefinedstates(self):
         raw_states = self._api.get_userdefinedstates()
         for raw_state in raw_states:
             userdefinedstate_id = raw_state["id"]
-            userdefinedstate = SHCUserDefinedState(api=self._api, raw_state=raw_state)
+            userdefinedstate = SHCUserDefinedState(
+                api=self._api, info=self.information, raw_state=raw_state
+            )
             self._userdefinedstates_by_id[userdefinedstate_id] = userdefinedstate
 
     def _initialize_domains(self):
@@ -134,6 +149,9 @@ class SHCSession:
             self._api.get_domain_intrusion_detection(),
             self.information.macAddress,
         )
+
+    def _initialize_emma(self):
+        self._emma = SHCEmma(self._api, self._shc_information, None)
 
     def _long_poll(self, wait_seconds=10):
         if self._poll_id is None:
@@ -180,6 +198,11 @@ class SHCSession:
                     raw_result["arguments"]["deviceServiceDataModel"]
                 )
                 self._process_long_polling_poll_result(raw_data_model)
+            else:
+                # callback is missing when receiving new message
+                message_id = raw_result["id"]
+                message = SHCMessage(api=self._api, raw_message=raw_result)
+                self._messages_by_id[message_id] = message
             return
         if raw_result["@type"] == "scenarioTriggered":
             if raw_result["id"] in self._scenario_callbacks:
@@ -218,7 +241,7 @@ class SHCSession:
                 )
             else:
                 userdefinedstate = SHCUserDefinedState(
-                    api=self._api, raw_state=raw_result
+                    api=self._api, info=self.information, raw_state=raw_result
                 )
                 self._userdefinedstates_by_id[state_id] = userdefinedstate
                 for instance, callback in self._subscribers:
@@ -228,6 +251,10 @@ class SHCSession:
                 for callback in self._userdefinedstate_callbacks[state_id]:
                     callback()
             return
+        if raw_result["@type"] == "link":
+            link_id = raw_result["id"]
+            if link_id == "com.bosch.tt.emma.applink":
+                self._emma.update_emma_data(raw_result)
         return
 
     def start_polling(self):
@@ -328,6 +355,14 @@ class SHCSession:
         return self._scenarios_by_id[scenario_id]
 
     @property
+    def messages(self) -> typing.Sequence[SHCMessage]:
+        return list(self._messages_by_id.values())
+
+    @property
+    def emma(self) -> SHCEmma:
+        return self._emma
+
+    @property
     def userdefinedstates(self) -> typing.Sequence[SHCUserDefinedState]:
         return list(self._userdefinedstates_by_id.values())
 
@@ -368,6 +403,7 @@ class SHCSession:
             "device_service",
             "rooms",
             "scenarios",
+            "messages",
             "info",
             "information",
             "public_information",
@@ -398,6 +434,9 @@ class SHCSession:
 
             case "scenarios":
                 return self._api.get_scenarios()
+
+            case "messages":
+                return self._api.get_messages()
 
             case "info" | "information":
                 return self._api.get_information()
